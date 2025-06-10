@@ -125,7 +125,14 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 			}
 			s := r.Content.String()
 			if len(s) > 0 {
-				c.Separator(model, s) // Denote end of request input.
+				// Denote end of request input.
+				bx := box.New(os.Stderr)
+				bx.Content.Write([]byte(PromptStart + s))
+				err := bx.Print(color.FgHiGreen)
+				if err != nil {
+					log.Fatalf("Error printing box: %v\n", err)
+				}
+
 			}
 
 			// Yield the request.
@@ -182,25 +189,4 @@ func (c *C) Run(model *string) error {
 	}
 
 	return nil
-}
-
-// Separator prints a separator line.
-func (c *C) Separator(model *string, s string) {
-	bx := box.New(os.Stderr)
-	bx.Output = c.rl.Stdout()
-	bx.Content.Write([]byte(s))
-	// bx.Print()
-	// bx.Content.Write([]byte("xyz\n123\n"))
-	err := bx.Print(color.FgHiGreen)
-	if err != nil {
-		log.Fatalf("Error printing box: %v\n", err)
-	}
-	// os.Exit(0)
-
-	// color.New(color.FgHiWhite, color.Italic, color.ReverseVideo).
-	// 	Fprintf(os.Stdout,
-	// 		"__________%s: model: %s|__________\n",
-	// 		time.Now().Format(time.RFC3339),
-	// 		*model,
-	// 	)
 }
