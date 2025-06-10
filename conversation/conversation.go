@@ -128,13 +128,7 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 				c.Separator(model, s) // Denote end of request input.
 			}
 
-			// Denote new request input.
-			c.rl.SetPrompt(fmt.Sprintf("%s", PromptStart))
-
-			// if len(strings.TrimSpace(r.Content.String())) > 0 {
-			// 	// break
-			// }
-
+			// Yield the request.
 			if !yield(r) {
 				return
 			}
