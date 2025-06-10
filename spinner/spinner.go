@@ -47,17 +47,14 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 		defer c.Printf("\x1b[?25h") // show cursor
 		for s.running {
 			for i := 0; i < len(s.chars); i++ {
-				delay := time.Since(s.startAt).Truncate(10 * time.Millisecond)
-				// payload := fmt.Sprintf("%s %s", s.chars[i], delay)
-				payload := fmt.Sprintf("%s", delay)
+				payload := fmt.Sprintf("%-5s", time.Since(s.startAt).Truncate(10*time.Millisecond))
 				c.Printf("\r╰─(%s)%s╯", payload, strings.Repeat("─", s.width-len(payload)-5))
 				c.Printf("\x1b[?25l") // hide cursor
-				time.Sleep(250 * time.Millisecond)
+				time.Sleep(333 * time.Millisecond)
 			}
 		}
-		// if ran {
+
 		c.Println()
-		// }
 	}()
 
 	return f()

@@ -103,7 +103,7 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 	return func(yield func(*request.Request) bool) {
 		for {
 			// Denote new request input.
-			c.rl.SetPrompt(fmt.Sprintf("@%s %s", *model, PromptStart))
+			c.rl.SetPrompt(color.New(color.FgHiYellow).Sprintf("@%s%s", *model, PromptStart))
 			r := request.New()
 
 		ContinuationLoop:
