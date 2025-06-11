@@ -140,7 +140,7 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 func (c *C) Run(model *string) error {
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStylePath("dark"),
-		glamour.WithWordWrap(80),
+		glamour.WithWordWrap(c.rl.Terminal.GetConfig().FuncGetWidth()),
 	)
 	if err != nil {
 		return err

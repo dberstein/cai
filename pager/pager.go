@@ -21,27 +21,27 @@ type Pager struct {
 
 // runWithPager executes a pager command and pipes the given content to it.
 func runWithPager(content fmt.Stringer) error {
-	// The convention is to use the PAGER env var if set, otherwise fall back.
-	pager := os.Getenv("PAGER")
+	// // The convention is to use the PAGER env var if set, otherwise fall back.
+	// pager := os.Getenv("PAGER")
+	var pager string
 
 	pagerArgs := []string{}
-	// Find the pager to use.
-	if pager == "" {
-		// Look for 'less'.
-		if path, err := exec.LookPath("less"); err == nil {
-			pager = path
-			pagerArgs = []string{
-				"-R", // The -R flag allows `less` to interpret ANSI color escape codes.
-				"-F", // The -F flag causes `less` to exit if the entire content fits on one screen.
-				"-X", // The -X flag disables sending termcap init/deinit strings to the terminal.
-				"-N", // The -N flag causes `less` to print line numbers.
-			}
-		} else {
-			// No pager found, so we'll just print it with line numbers.
-			pager = "cat"
-			pagerArgs = []string{"-n"}
+
+	// Look for 'less'.
+	if path, err := exec.LookPath("less"); err == nil {
+		pager = path
+		pagerArgs = []string{
+			"-R", // The -R flag allows `less` to interpret ANSI color escape codes.
+			"-F", // The -F flag causes `less` to exit if the entire content fits on one screen.
+			"-X", // The -X flag disables sending termcap init/deinit strings to the terminal.
+			"-N", // The -N flag causes `less` to print line numbers.
 		}
+	} else {
+		// No pager found, so we'll just print it with line numbers.
+		pager = "cat"
+		pagerArgs = append(pagerArgs, "-n")
 	}
+	// }
 
 	cmd := exec.Command(pager, pagerArgs...)
 

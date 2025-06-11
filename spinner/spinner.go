@@ -50,13 +50,15 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 
 		for s.IsRunning() {
 			stopwatch := time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-			w := s.width - 12 - len(stopwatch.String())
+			clrA := color.New(color.ReverseVideo, color.FgHiGreen)
+			clrB := color.New(color.FgHiGreen)
+			w := s.width - 15 - len(stopwatch.String())
 			for i := 0; i < w; i++ {
 				if !s.IsRunning() {
 					break
 				}
 				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clr.Fprintf(os.Stdout, "\r╰─%s─┤%s├─%s─╯", strings.Repeat("─", i), stopwatch.String(), strings.Repeat("─", w-i-1))
+				clrA.Fprintf(os.Stdout, "\r╰─%s─┤ %s :─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
 				time.Sleep(s.sleep)
 			}
 			for i := w; i > 0; i-- {
@@ -64,7 +66,7 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 					break
 				}
 				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clr.Fprintf(os.Stdout, "\r╰─%s─┤%s├─%s─╯", strings.Repeat("─", i), stopwatch.String(), strings.Repeat("─", w-i+1))
+				clrA.Fprintf(os.Stdout, "\r╰─%s─: %s ├─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
 				time.Sleep(s.sleep)
 			}
 		}
