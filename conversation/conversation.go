@@ -79,7 +79,7 @@ func (c *C) Close() {
 
 // Submit submits a user request to the provider and returns the response.
 func (c *C) Submit(bs *bytes.Buffer, request *request.Request) *response.Response {
-	s := spinner.New(box.New(os.Stdout, nil).Width)
+	s := spinner.New(box.New(os.Stdout, bs).Width)
 	err := s.Wrap(c.rl.Stdout(), func() error {
 		// TODO: err := prompt.Augment(request.Content)
 		err := c.provider.Generate(context.Background(), request.Content.String(), bs)

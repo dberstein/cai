@@ -12,7 +12,7 @@ import (
 func New(width int) *Spinner {
 	return &Spinner{
 		width: width,
-		sleep: 123 * time.Millisecond,
+		sleep: 234 * time.Millisecond,
 	}
 }
 
