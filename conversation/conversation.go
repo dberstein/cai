@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/chzyer/readline"
@@ -24,8 +23,8 @@ import (
 	"github.com/dberstein/cai/spinner"
 )
 
-const PromptStart = "> "
-const PromptContinuation = " .. "
+const PromptStart = " Ctrl+D:EOF> "
+const PromptContinuation = ".. "
 
 // New returns a new conversation for the given provider.
 func New(provider *provider.Provider) *C {
@@ -38,7 +37,7 @@ func New(provider *provider.Provider) *C {
 	}
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:            PromptStart,
+		Prompt:            color.CyanString(PromptStart),
 		HistoryFile:       historyFile,
 		HistorySearchFold: true,
 		// UniqueEditLine:    true,
@@ -80,22 +79,17 @@ func (c *C) Close() {
 
 // Submit submits a user request to the provider and returns the response.
 func (c *C) Submit(bs *bytes.Buffer, request *request.Request) *response.Response {
-	if request.Content == nil {
-		return response.New(nil, fmt.Errorf("request content is nil"))
-	}
-	s := spinner.New(box.New(os.Stderr).Width)
-	body := ""
+	s := spinner.New(box.New(os.Stdout, nil).Width)
 	err := s.Wrap(c.rl.Stdout(), func() error {
 		// TODO: err := prompt.Augment(request.Content)
-		b, err := c.provider.Generate(context.Background(), request.Content.String())
+		err := c.provider.Generate(context.Background(), request.Content.String(), bs)
 		if err != nil {
 			return err
 		}
-		body = b
 		return nil
 	}, color.FgHiGreen)
 
-	return response.New(content.NewString(&body), err)
+	return response.New(bs, err)
 }
 
 // Iter returns an iterator of request.Request(s).
@@ -103,7 +97,7 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 	return func(yield func(*request.Request) bool) {
 		for {
 			// Denote new request input.
-			c.rl.SetPrompt(color.New(color.FgHiYellow).Sprintf("@%s%s", *model, PromptStart))
+			c.rl.SetPrompt(color.New(color.FgHiYellow).Sprintf("@%s%s", *model, color.CyanString(PromptStart)))
 			r := request.New()
 
 		ContinuationLoop:
@@ -123,17 +117,17 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 				// Denote request input continuation.
 				c.rl.SetPrompt(PromptContinuation)
 			}
-			s := r.Content.String()
-			if len(s) > 0 {
-				// Denote end of request input.
-				bx := box.New(os.Stderr)
-				bx.Content.Write([]byte(PromptStart + s))
-				err := bx.Print(color.FgHiGreen)
-				if err != nil {
-					log.Fatalf("Error printing box: %v\n", err)
-				}
 
+			// Denote end of request input.
+			buf := bytes.NewBufferString("")
+			bx := box.New(os.Stdout, buf, color.FgHiGreen)
+			text := r.Content.String()
+			bx.Content.WriteString(text)
+			err := bx.Close()
+			if err != nil {
+				log.Fatalf("Error printing box: %v\n", err)
 			}
+			io.Copy(c.rl.Stdout(), buf)
 
 			// Yield the request.
 			if !yield(r) {
@@ -144,7 +138,6 @@ func (c *C) Iter(bs *bytes.Buffer, model *string) iter.Seq[*request.Request] {
 }
 
 func (c *C) Run(model *string) error {
-	pager := pager.New()
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStylePath("dark"),
 		glamour.WithWordWrap(80),
@@ -153,39 +146,35 @@ func (c *C) Run(model *string) error {
 		return err
 	}
 
+	pager := pager.New()
 	bs := bytes.NewBuffer(nil)
-	printer := pager.WriteFunc()
 
 	// iterate over input requests
 	for req := range c.Iter(bs, model) {
-		// 1. handle macros amd commands in input
+		// Handle macros amd commands in input
 		// TODO: implement
 
-		// 2. submit to provider
+		// Submit to provider
 		res := c.Submit(bs, req)
 		err := res.Error()
 		if err != nil {
 			return err
 		}
 
-		// 3. process response
+		// Process response
 		err = res.Process()
 		if err != nil {
 			return err
 		}
 
-		// 4. display response
-		for _, ln := range strings.Split(res.Content.String(), "\n") {
-			rmd, err := renderer.Render(ln)
-			if err != nil {
-				return err
-			}
-			_ = rmd
-			// ln = rmd
-			cc := content.NewString(&ln)
-			cc.Append(&NL)
-			printer(cc)
+		// Display response
+		rmd, err := renderer.Render(res.Content.String())
+		if err != nil {
+			return err
 		}
+
+		// Invoke paginator
+		pager.WriteFunc(content.NewString(&rmd))
 	}
 
 	return nil

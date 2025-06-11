@@ -2,8 +2,13 @@ package provider
 
 import (
 	"context"
+	"io"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/dberstein/cai/box"
 	"github.com/fatih/color"
 	"google.golang.org/genai"
 )
@@ -41,29 +46,49 @@ func (p *Provider) ListModels(ctx context.Context) ([]string, error) {
 	return models, nil
 }
 
-func (p *Provider) Generate(ctx context.Context, prompt string) (string, error) {
+func (p *Provider) Generate(ctx context.Context, prompt string, w io.Writer) error {
+	start := time.Now()
 	r, err := p.client.Models.GenerateContent(ctx, *p.model, genai.Text(prompt), &genai.GenerateContentConfig{
-		Temperature: genai.Ptr[float32](1.0),
+		Temperature: genai.Ptr[float32](0.2),
 		// TopP:        0.2,
 		// TopK:        1,
-		// CandidateCount: 1,
+		CandidateCount: 1,
 		// ResponseMIMEType: "application/json",
 	})
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	res := []string{}
 	for i, c := range r.Candidates {
-		lines := 0
+		lines := []string{}
 		for _, p := range c.Content.Parts {
-			for _, l := range strings.Split(p.Text, "\n") {
-				res = append(res, l)
-				lines += 1
+			inner := strings.Split(p.Text, "\n")
+			lines = append(lines, inner...)
+
+			_, err := w.Write([]byte(p.Text))
+			if err != nil {
+				return err
 			}
+
+			// Summary box for the candidate
+			bx := box.New(os.Stdout, w, color.FgHiMagenta, color.Bold)
+			_, err = bx.Content.WriteString(strings.Join([]string{
+				"Candidate #" + strconv.Itoa(i+1) + " / " + strconv.Itoa(len(inner)) + " line(s)",
+				"Delay: " + time.Since(start).Truncate(100*time.Millisecond).String(),
+			}, " ┆ "))
+			if err != nil {
+				return err
+			}
+
+			// err = bx.Close()
+			err = bx.Print()
+			if err != nil {
+				return err
+			}
+
+			return nil
 		}
-		res = append(res, color.GreenString("│ End of response candidate: %d, Lines: %d", i+1, lines))
 	}
 
-	return strings.Join(res, "\n"), nil
+	return nil
 }

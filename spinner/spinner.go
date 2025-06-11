@@ -1,8 +1,8 @@
 package spinner
 
 import (
-	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -11,16 +11,17 @@ import (
 
 func New(width int) *Spinner {
 	return &Spinner{
-		chars: []string{"+", "*", "|", "/", "-", "\\"},
 		width: width,
+		sleep: 123 * time.Millisecond,
 	}
 }
 
+// Spinner is a simple spinner.
 type Spinner struct {
-	chars   []string
-	width   int
-	running bool
-	startAt time.Time
+	width     int
+	running   bool
+	startedAt time.Time
+	sleep     time.Duration
 }
 
 func (s *Spinner) IsRunning() bool {
@@ -28,7 +29,7 @@ func (s *Spinner) IsRunning() bool {
 }
 
 func (s *Spinner) StartedAt() time.Time {
-	return s.startAt
+	return s.startedAt
 }
 
 func (s *Spinner) Reset() {
@@ -43,26 +44,38 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 	defer s.Stop()
 
 	go func() {
-		c := color.New(a...)
-		defer c.Printf("\x1b[?25h") // show cursor
-		for s.running {
-			for i := 0; i < len(s.chars); i++ {
-				payload := fmt.Sprintf("%-5s", time.Since(s.startAt).Truncate(10*time.Millisecond))
-				c.Printf("\r╰─(%s)%s╯", payload, strings.Repeat("─", s.width-len(payload)-5))
-				c.Printf("\x1b[?25l") // hide cursor
-				time.Sleep(333 * time.Millisecond)
+		clr := color.New(a...)
+		clr.Printf("\x1b[?25l")       // hide cursor
+		defer clr.Printf("\x1b[?25h") // show cursor
+
+		for s.IsRunning() {
+			stopwatch := time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
+			w := s.width - 12 - len(stopwatch.String())
+			for i := 0; i < w; i++ {
+				if !s.IsRunning() {
+					break
+				}
+				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
+				clr.Fprintf(os.Stdout, "\r╰─%s─┤%s├─%s─╯", strings.Repeat("─", i), stopwatch.String(), strings.Repeat("─", w-i-1))
+				time.Sleep(s.sleep)
+			}
+			for i := w; i > 0; i-- {
+				if !s.IsRunning() {
+					break
+				}
+				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
+				clr.Fprintf(os.Stdout, "\r╰─%s─┤%s├─%s─╯", strings.Repeat("─", i), stopwatch.String(), strings.Repeat("─", w-i+1))
+				time.Sleep(s.sleep)
 			}
 		}
-
-		c.Println()
 	}()
 
 	return f()
 }
 
 func (s *Spinner) Start() error {
+	s.startedAt = time.Now()
 	s.running = true
-	s.startAt = time.Now()
 	return nil
 }
 
