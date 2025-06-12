@@ -12,7 +12,7 @@ import (
 func New(width int) *Spinner {
 	return &Spinner{
 		width: width,
-		sleep: 234 * time.Millisecond,
+		sleep: 100 * time.Millisecond,
 	}
 }
 
@@ -58,7 +58,7 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 					break
 				}
 				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clrA.Fprintf(os.Stdout, "\r╰─%s─┤ %s :─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
+				clrA.Fprintf(os.Stdout, "\r╰─%s─┤ %s %s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
 				time.Sleep(s.sleep)
 			}
 			for i := w; i > 0; i-- {
@@ -66,7 +66,7 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 					break
 				}
 				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clrA.Fprintf(os.Stdout, "\r╰─%s─: %s ├─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
+				clrA.Fprintf(os.Stdout, "\r╰─%s %s ├─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
 				time.Sleep(s.sleep)
 			}
 		}

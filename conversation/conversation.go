@@ -175,6 +175,8 @@ func (c *C) Run(model *string) error {
 
 		// Invoke paginator
 		pager.WriteFunc(content.NewString(&rmd))
+
+		bs.Reset()
 	}
 
 	return nil

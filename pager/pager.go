@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"golang.org/x/term"
 )
@@ -97,7 +98,12 @@ func (p *Pager) WriteFunc(s fmt.Stringer) {
 		log.Printf("pager failed: %v", err)
 	}
 
+	// Horizontal line
+	if width, _, err := p.GetSize(); err == nil {
+		fmt.Print(strings.Repeat("┄", width))
+	}
+
 	// Always print content after the pager.
-	fmt.Print("\033[H\033[2J")
-	fmt.Printf(s.String())
+	fmt.Print("\033[H\033[2J") // clear screen
+	fmt.Print(s.String())
 }

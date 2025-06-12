@@ -49,7 +49,7 @@ func (p *Provider) ListModels(ctx context.Context) ([]string, error) {
 func (p *Provider) Generate(ctx context.Context, prompt string, w io.Writer) error {
 	start := time.Now()
 	r, err := p.client.Models.GenerateContent(ctx, *p.model, genai.Text(prompt), &genai.GenerateContentConfig{
-		Temperature: genai.Ptr[float32](0.2),
+		Temperature: genai.Ptr[float32](1.0),
 		// TopP:        0.2,
 		// TopK:        1,
 		CandidateCount: 1,
@@ -61,27 +61,17 @@ func (p *Provider) Generate(ctx context.Context, prompt string, w io.Writer) err
 
 	for i, c := range r.Candidates {
 		lines := []string{}
-		for _, p := range c.Content.Parts {
-			inner := strings.Split(p.Text, "\n")
+		for _, prt := range c.Content.Parts {
+			inner := strings.Split(prt.Text, "\n")
 			lines = append(lines, inner...)
 
-			_, err := w.Write([]byte(p.Text))
+			_, err := w.Write([]byte(prt.Text))
 			if err != nil {
 				return err
 			}
 
 			// Summary box for the candidate
-			bx := box.New(os.Stdout, w, color.FgHiMagenta, color.Bold)
-			_, err = bx.Content.WriteString(strings.Join([]string{
-				"Candidate #" + strconv.Itoa(i+1) + " / " + strconv.Itoa(len(inner)) + " line(s)",
-				"Delay: " + time.Since(start).Truncate(100*time.Millisecond).String(),
-			}, " ┆ "))
-			if err != nil {
-				return err
-			}
-
-			// err = bx.Close()
-			err = bx.Print()
+			_, err = p.summary(w, i, inner, start)
 			if err != nil {
 				return err
 			}
@@ -91,4 +81,23 @@ func (p *Provider) Generate(ctx context.Context, prompt string, w io.Writer) err
 	}
 
 	return nil
+}
+
+func (p *Provider) summary(w io.Writer, i int, inner []string, start time.Time) (*box.Box, error) {
+	bx := box.New(os.Stdout, w, color.FgHiMagenta, color.Bold)
+	_, err := bx.Content.WriteString(strings.Join([]string{
+		"Candidate #" + strconv.Itoa(i+1) + " / " + strconv.Itoa(len(inner)) + " line(s)",
+		"Delay: " + time.Since(start).Truncate(100*time.Millisecond).String(),
+	}, " ┆ "))
+	if err != nil {
+		return bx, err
+	}
+
+	// err = bx.Close()
+	err = bx.Print()
+	if err != nil {
+		return bx, err
+	}
+
+	return bx, nil
 }
