@@ -1,18 +1,18 @@
 package spinner
 
 import (
+	"fmt"
 	"io"
-	"os"
-	"strings"
 	"time"
 
+	"github.com/dberstein/cai/tui"
 	"github.com/fatih/color"
 )
 
 func New(width int) *Spinner {
 	return &Spinner{
 		width: width,
-		sleep: 100 * time.Millisecond,
+		sleep: 150 * time.Millisecond,
 	}
 }
 
@@ -48,28 +48,10 @@ func (s *Spinner) Wrap(w io.Writer, f func() error, a ...color.Attribute) error 
 		clr.Printf("\x1b[?25l")       // hide cursor
 		defer clr.Printf("\x1b[?25h") // show cursor
 
-		for s.IsRunning() {
-			stopwatch := time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-			clrA := color.New(color.ReverseVideo, color.FgHiGreen)
-			clrB := color.New(color.FgHiGreen)
-			w := s.width - 15 - len(stopwatch.String())
-			for i := 0; i < w; i++ {
-				if !s.IsRunning() {
-					break
-				}
-				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clrA.Fprintf(os.Stdout, "\r╰─%s─┤ %s %s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
-				time.Sleep(s.sleep)
-			}
-			for i := w; i > 0; i-- {
-				if !s.IsRunning() {
-					break
-				}
-				stopwatch = time.Since(s.StartedAt()).Truncate(100 * time.Millisecond)
-				clrA.Fprintf(os.Stdout, "\r╰─%s %s ├─%s─╯", strings.Repeat("─", i), clrA.Sprint(stopwatch.String()), clrB.Sprint(strings.Repeat("─", max(0, w-i))))
-				time.Sleep(s.sleep)
-			}
-		}
+		leftColor := color.New(color.FgHiGreen, color.ReverseVideo)
+		rightColor := color.New(color.FgHiGreen)
+
+		tui.Spinner(s.IsRunning, s.StartedAt(), s.sleep, s.width, leftColor, rightColor)
 	}()
 
 	return f()
@@ -82,6 +64,10 @@ func (s *Spinner) Start() error {
 }
 
 func (s *Spinner) Stop() error {
-	s.running = false
+	if s.IsRunning() {
+		s.running = false
+		fmt.Printf("\n")
+	}
+
 	return nil
 }

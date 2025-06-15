@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
+
+	"errors"
 
 	"golang.org/x/term"
 )
@@ -21,11 +22,10 @@ type Pager struct {
 }
 
 // runWithPager executes a pager command and pipes the given content to it.
-func runWithPager(content fmt.Stringer) error {
-	// // The convention is to use the PAGER env var if set, otherwise fall back.
+func runWithPager(stdout io.Writer, stderr io.Writer, content fmt.Stringer) error {
+	// The convention is to use the PAGER env var if set, otherwise fall back.
 	// pager := os.Getenv("PAGER")
 	var pager string
-
 	pagerArgs := []string{}
 
 	// Look for 'less'.
@@ -35,14 +35,17 @@ func runWithPager(content fmt.Stringer) error {
 			"-R", // The -R flag allows `less` to interpret ANSI color escape codes.
 			"-F", // The -F flag causes `less` to exit if the entire content fits on one screen.
 			"-X", // The -X flag disables sending termcap init/deinit strings to the terminal.
-			"-N", // The -N flag causes `less` to print line numbers.
+			// "-N", // The -N flag causes `less` to print line numbers.
 		}
-	} else {
-		// No pager found, so we'll just print it with line numbers.
-		pager = "cat"
-		pagerArgs = append(pagerArgs, "-n")
 	}
-	// }
+
+	// Fallback to `cat` if pager not found.
+	if pager == "" {
+		pager = "cat"
+		pagerArgs = []string{
+			"-n", // The -n flag causes `cat` to print line numbers.
+		}
+	}
 
 	cmd := exec.Command(pager, pagerArgs...)
 
@@ -52,9 +55,8 @@ func runWithPager(content fmt.Stringer) error {
 		return err
 	}
 
-	// The pager should write to the original TTY.
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	// Start the pager.
 	if err := cmd.Start(); err != nil {
@@ -64,7 +66,8 @@ func runWithPager(content fmt.Stringer) error {
 	// Write our content to the pager's Stdin.
 	// We use a buffer to ensure the write is non-blocking.
 	// A direct io.WriteString might block if the content is large.
-	_, err = io.Copy(pagerIn, bytes.NewBufferString(content.String()))
+	text := content.String()
+	_, err = io.Copy(pagerIn, strings.NewReader(text))
 	if err != nil {
 		// If we can't write to the pager, we should probably kill it.
 		_ = cmd.Process.Kill()
@@ -85,18 +88,22 @@ func (p *Pager) GetSize() (width, height int, err error) {
 	return term.GetSize(int(os.Stdout.Fd()))
 }
 
-func (p *Pager) WriteFunc(s fmt.Stringer) {
+func (p *Pager) WriteFunc(s fmt.Stringer) error {
 	// Check if we are in an interactive terminal.
 	// If not, just print the content and exit. We don't want to pipe to `less`
 	// if the user is redirecting output to a file.
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		return
+		fmt.Print(s.String())
+		return fmt.Errorf("not in an interactive terminal")
 	}
 
 	// Always run through pager.
-	if err := runWithPager(s); err != nil {
-		log.Printf("pager failed: %v", err)
+	if err := runWithPager(os.Stdout, os.Stderr, s); err != nil {
+		return errors.New(fmt.Sprintf("pager failed: %v", err))
 	}
+
+	// Clear screen
+	fmt.Print("\033[H\033[2J")
 
 	// Horizontal line
 	if width, _, err := p.GetSize(); err == nil {
@@ -104,6 +111,6 @@ func (p *Pager) WriteFunc(s fmt.Stringer) {
 	}
 
 	// Always print content after the pager.
-	fmt.Print("\033[H\033[2J") // clear screen
-	fmt.Print(s.String())
+	_, err := fmt.Print(s.String())
+	return err
 }
